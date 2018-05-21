@@ -16,7 +16,14 @@ class ActionLayer(BaseActionLayer):
         layers.ActionNode
         """
         # TODO: implement this function
-        raise NotImplementedError
+        for A in actionA.effects:
+            if ~A in actionB.effects:
+                return True
+        for B in actionB.effects:
+            if ~B in actionA.effects:
+                return True
+        return False
+        #raise NotImplementedError
 
 
     def _interference(self, actionA, actionB):
@@ -27,6 +34,8 @@ class ActionLayer(BaseActionLayer):
         layers.ActionNode
         """
         # TODO: implement this function
+        for A in actionA.effects:
+            
         raise NotImplementedError
 
     def _competing_needs(self, actionA, actionB):
