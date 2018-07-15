@@ -56,6 +56,7 @@ class ActionLayer(BaseActionLayer):
             for B in actionB.preconditions:
                 if self.parent_layer.is_mutex(A,B):
                     return True
+        return False
 #raise NotImplementedError
 
 
@@ -149,12 +150,13 @@ class PlanningGraph:
         """
         # TODO: implement this function
         levelsum = 0
-        self.fill()
+        #self.fill()
         for goal in self.goal:
             for cost, layer in enumerate(self.literal_layers):
-                #self._extend()
+                self._extend()
                 if goal in layer:
                     levelsum += cost
+                    break
         return levelsum
         #raise NotImplementedError
 
@@ -187,12 +189,13 @@ class PlanningGraph:
         """
         # TODO: implement maxlevel heuristic
         maxlevel = []
-        self.fill()
+        #self.fill()
         for goal in self.goal:
             for cost, layer in enumerate(self.literal_layers):
-                #self._extend()
+                self._extend()
                 if goal in layer:
                     maxlevel.append(cost)
+                    break
         return max(maxlevel)
         #raise NotImplementedError
 
@@ -219,6 +222,26 @@ class PlanningGraph:
         WARNING: you should expect long runtimes using this heuristic on complex problems
         """
         # TODO: implement setlevel heuristic
+        level = 0
+        #self.fill()
+        while not self._is_leveled:
+            #for layer in self.literal_layers:
+            layer = self.literal_layers[level]
+            allGoalsMet = True
+            for goal in self.goal:
+                if goal not in layer:
+                    allGoalsMet = False
+            if allGoalsMet:
+                goalsAreMutex = False
+                for goalA, goalB in combinations(self.goal,2):
+                    if layer.is_mutex(goalA, goalB):
+                        goalsAreMutex = True
+                if not goalsAreMutex:
+                    return level
+                    break
+            level += 1
+            self._extend()
+
         #raise NotImplementedError
 
     ##############################################################################
