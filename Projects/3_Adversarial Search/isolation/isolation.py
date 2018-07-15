@@ -74,7 +74,7 @@ class Isolation(NamedTuple('Isolation', [('board', int), ('ply_count', int), ('l
         loc = self.locs[self.player()]
         if loc is None:
             return self.liberties(loc)
-        return [a for a in Action if (a + loc) > 0 and (self.board & (1 << (a + loc)))]
+        return [a for a in Action if (a + loc) >= 0 and (self.board & (1 << (a + loc)))]
 
     def player(self):
         """ Return the id (zero for first player, one for second player) of player
@@ -213,6 +213,16 @@ class DebugState(Isolation):
 
     @property
     def bitboard_string(self): return "{:b}".format(self.board)
+
+    @classmethod
+    def ind2xy(cls, ind):
+        """ Convert from board index value to xy coordinates
+
+        The coordinate frame is 0 in the bottom right corner, with x increasing
+        along the columns progressing towards the left, and y increasing along
+        the rows progressing towards teh top.
+        """
+        return (ind % (_WIDTH + 2), ind // (_WIDTH + 2))
 
     def __str__(self):
         """ Generate a string representation of the current game state, marking

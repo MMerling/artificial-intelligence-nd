@@ -8,6 +8,7 @@ import os
 import random
 import textwrap
 
+from collections import namedtuple
 from multiprocessing.pool import ThreadPool as Pool
 
 from isolation import Isolation, Agent, play
@@ -27,10 +28,12 @@ TEST_AGENTS = {
     "SELF": Agent(CustomPlayer, "Custom TestAgent")
 }
 
+Match = namedtuple("Match", "players initial_state time_limit match_id debug_flag")
 
-def _run_matches(matches, name, num_processes=NUM_PROCS):
+
+def _run_matches(matches, name, num_processes=NUM_PROCS, debug=False):
     results = []
-    pool = Pool(num_processes)
+    pool = Pool(1) if debug else Pool(num_processes)
     print("Running {} games:".format(len(matches)))
     for result in pool.imap_unordered(play, matches):
         print("+" if result[0].name == name else '-', end="")
@@ -42,10 +45,20 @@ def _run_matches(matches, name, num_processes=NUM_PROCS):
 def make_fair_matches(matches, results):
     new_matches = []
     for _, game_history, match_id in results:
+        if len(game_history) < 2:
+            logger.warn(textwrap.dedent("""\
+                Unable to duplicate match {}
+                -- one of the players forfeit at the first move
+                """.format(match_id)))
+            continue
         match = matches[match_id]
-        state = Isolation()
-        state = state.result(game_history[0]).result(game_history[1])
-        new_matches.append((match[0][::-1], match[1], match[2], -match_id))
+        state = Isolation().result(game_history[0]).result(game_history[1])
+        fair_match = Match(players=match.players[::-1],
+                          initial_state=state,
+                          time_limit=match.time_limit,
+                          match_id=-match.match_id,
+                          debug_flag=match.debug_flag)
+        new_matches.append(fair_match)
     return new_matches
 
 
@@ -64,10 +77,22 @@ def play_matches(custom_agent, test_agent, cli_args):
     """
     matches = []
     for match_id in range(cli_args.rounds):
-        # initialize all games with a random move and response
         state = Isolation()
-        matches.append(((test_agent, custom_agent), state, cli_args.time_limit, match_id))
-        matches.append(((custom_agent, test_agent), state, cli_args.time_limit, match_id))
+        matches.append(Match(
+            players=(test_agent, custom_agent),
+            initial_state=state,
+            time_limit=cli_args.time_limit,
+            match_id=2 * match_id,
+            debug_flag=cli_args.debug))
+        matches.append(Match(
+            players=(custom_agent, test_agent),
+            initial_state=state,
+            time_limit=cli_args.time_limit,
+            match_id=2 * match_id + 1,
+            debug_flag=cli_args.debug))
+
+    # Run all matches -- must be done before fair matches in order to populate
+    # the first move from each player; these moves are reused in the fair matches
     results = _run_matches(matches, custom_agent.name, cli_args.processes)
 
     if cli_args.fair_matches:
@@ -106,6 +131,15 @@ if __name__ == "__main__":
 
                 $python run_match.py -r 100
         """)
+    )
+    parser.add_argument(
+        '-d', '--debug', action="store_true",
+        help="""\
+            Run the matches in debug mode, which disables multiprocessing & multithreading
+            support. This may be useful for inspecting memory contents during match execution,
+            however, this also prevents the isolation library from detecting timeouts and
+            terminating your code.
+        """
     )
     parser.add_argument(
         '-f', '--fair_matches', action="store_true",
@@ -155,7 +189,8 @@ if __name__ == "__main__":
         "Rounds: {}\n".format(args.rounds) +
         "Fair Matches: {}\n".format(args.fair_matches) +
         "Time Limit: {}\n".format(args.time_limit) +
-        "Processes: {}".format(args.processes)
+        "Processes: {}\n".format(args.processes) +
+        "Debug Mode: {}".format(args.debug)
     )
 
     main(args)
